@@ -1,0 +1,79 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '4.1.0'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+description = 'board-project'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+// QueryDSL 버전을 변수로 관리 (한 곳에서만 버전 관리하기 위함)
+ext {
+    querydslVersion = "7.1"
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    compileOnly 'org.projectlombok:lombok'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    runtimeOnly 'com.mysql:mysql-connector-j'
+    annotationProcessor 'org.projectlombok:lombok'
+    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testCompileOnly 'org.projectlombok:lombok'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+
+    // ---- QueryDSL 설정 시작 ----
+    // 원조 com.querydsl은 2024년 1월 이후 업데이트가 끊겨 Spring Boot 4 / Jakarta EE 11 / Hibernate 7과의
+    // 호환이 불확실합니다. 대신 활발히 관리되는 openfeign 커뮤니티 포크를 사용합니다.
+    // 참고: 원조(com.querydsl)는 javax/jakarta 두 네임스페이스를 다 지원해서 ':jakarta' 클래시파이어로 구분했지만,
+    // openfeign 포크는 처음부터 jakarta 네임스페이스만 지원하므로 클래시파이어가 없습니다. (이전 실수 - 존재하지 않는
+    // 아티팩트를 찾다가 다운로드 실패)
+    implementation "io.github.openfeign.querydsl:querydsl-jpa:${querydslVersion}"
+
+    // Q타입 클래스를 생성해주는 어노테이션 프로세서 (컴파일 시점에 QMember, QPost 같은 클래스를 자동 생성)
+    annotationProcessor "io.github.openfeign.querydsl:querydsl-apt:${querydslVersion}:jpa"
+    // @Entity가 붙은 클래스를 인식해서 Q타입을 만들려면 아래 두 개도 필요
+    annotationProcessor "jakarta.annotation:jakarta.annotation-api"
+    annotationProcessor "jakarta.persistence:jakarta.persistence-api"
+    // ---- QueryDSL 설정 끝 ----
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+// ---- QueryDSL이 생성하는 Q타입 클래스의 저장 경로 설정 ----
+// annotationProcessor가 생성한 소스코드(Q타입)를 build/generated 폴더에 저장하고,
+// 그 폴더를 컴파일 소스 경로로 추가해줘야 IntelliJ와 Gradle이 Q타입을 인식합니다.
+def generatedDir = file("build/generated/sources/annotationProcessor/java/main")
+
+sourceSets {
+    main {
+        java {
+            srcDirs += generatedDir
+        }
+    }
+}
+
+// clean 할 때 생성된 Q타입 파일들도 같이 삭제되도록 설정
+clean {
+    delete generatedDir
+}
