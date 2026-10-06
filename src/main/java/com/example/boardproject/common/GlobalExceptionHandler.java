@@ -5,6 +5,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.data.core.PropertyReferenceException;
+
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -12,6 +15,8 @@ import java.util.Map;
 
 import org.springframework.security.core.AuthenticationException;
 import java.util.LinkedHashMap;
+
+import org.springframework.http.converter.HttpMessageNotReadableException;
 
 /**
  * @RestControllerAdvice: 모든 @RestController에서 발생하는 특정 예외들을
@@ -35,6 +40,45 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(buildErrorBody(HttpStatus.BAD_REQUEST, e.getMessage()));
+    }
+
+    @ExceptionHandler(NotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleNotFoundException(NotFoundException e) {
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(buildErrorBody(HttpStatus.NOT_FOUND, e.getMessage()));
+    }
+
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<Map<String, Object>> handleUnauthorizedException(UnauthorizedException e) {
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(buildErrorBody(HttpStatus.UNAUTHORIZED, e.getMessage()));
+    }
+
+    @ExceptionHandler(PropertyReferenceException.class)
+    public ResponseEntity<Map<String, Object>> handleInvalidSort(PropertyReferenceException e) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(buildErrorBody(HttpStatus.BAD_REQUEST, "정렬 기준이 올바르지 않습니다."));
+    }
+
+    /**
+    요청의 visibility에 "ABC"처럼 없는 값이 오거나 JSON 형식이 깨지면 HttpMessageNotReadableException이 나요.
+    지금 핸들러에는 이 예외가 없어서 마지막 Exception.class 핸들러가 500으로 응답해요.
+    클라이언트 잘못이라 400이 맞으니 추가해 주세요.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, Object>> handleNotReadable(HttpMessageNotReadableException e) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(buildErrorBody(HttpStatus.BAD_REQUEST, "요청 형식이 올바르지 않습니다."));
+    }
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Map<String, Object>> handleTypeMismatch(MethodArgumentTypeMismatchException e) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(buildErrorBody(HttpStatus.BAD_REQUEST, "요청 값의 형식이 올바르지 않습니다."));
     }
 
     /**

@@ -3,6 +3,10 @@ spring:
     name: board-project
   profiles:
     active: local
+  data: # ← 추가
+    web:
+      pageable:
+        max-page-size: 50    # size를 아무리 크게 보내도 50으로 제한
   jpa:
     hibernate:
       ddl-auto: update

@@ -9,13 +9,14 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 
 import java.time.LocalDateTime;
 
@@ -44,13 +45,17 @@ public class Post extends BaseEntity {
     @Column(nullable = false, length = 200)
     private String title;
 
-    @Lob // 긴 텍스트 저장용 (MySQL에서 TEXT 타입으로 매핑됨)
-    @Column(nullable = false)
+
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_id", nullable = false) // 실제 FK 컬럼명 지정
     private Member author;
+
+    @Enumerated(EnumType.STRING) // Member.role과 같은 이유: 순서 번호가 아니라 이름으로 저장
+    @Column(nullable = false, length = 20)
+    private Visibility visibility;
 
     // ---- Soft Delete ----
     // 이 값이 null이 아니면 "삭제된 게시글"로 취급합니다.
@@ -58,10 +63,11 @@ public class Post extends BaseEntity {
     private LocalDateTime deletedAt;
 
     @Builder
-    private Post(String title, String content, Member author) {
+    private Post(String title, String content, Member author, Visibility visibility) {
         this.title = title;
         this.content = content;
         this.author = author;
+        this.visibility = (visibility == null) ? Visibility.PUBLIC : visibility; // 미지정 시 공개
     }
 
     public void update(String title, String content) {
@@ -75,5 +81,10 @@ public class Post extends BaseEntity {
 
     public boolean isDeleted() {
         return this.deletedAt != null;
+    }
+
+    /** 열람 규칙을 엔티티 한 곳에 모아둔다. 규칙이 바뀌면 여기만 고치면 된다. */
+    public boolean canBeReadBy(boolean loggedIn) {
+        return visibility == Visibility.PUBLIC || loggedIn;
     }
 }
