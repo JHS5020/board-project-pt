@@ -4,6 +4,7 @@ import com.example.boardproject.common.PageResponse;
 import com.example.boardproject.post.dto.PostCreateRequest;
 import com.example.boardproject.post.dto.PostListResponse;
 import com.example.boardproject.post.dto.PostResponse;
+import com.example.boardproject.post.dto.PostUpdateRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -51,6 +52,28 @@ public class PostController {
     public ResponseEntity<PageResponse<PostListResponse>> getPosts(
             @PageableDefault(size = 10, sort = "id", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(PageResponse.from(postService.getPosts(pageable)));
+    }
+
+    /** 게시글 수정. 로그인 필수. 성공 시 204 No Content. */
+    @PutMapping("/{postId}")
+    public ResponseEntity<Void> update(@PathVariable Long postId,
+                                       @Valid @RequestBody PostUpdateRequest request,
+                                       Authentication authentication) {
+        postService.update(postId, authentication.getName(), request);
+        return ResponseEntity.noContent().build();
+    }
+
+    /** 게시글 삭제(soft delete). 로그인 필수. 성공 시 204 No Content. */
+    @DeleteMapping("/{postId}")
+    public ResponseEntity<Void> delete(@PathVariable Long postId,
+                                       Authentication authentication) {
+        postService.delete(postId, authentication.getName(), isAdmin(authentication));
+        return ResponseEntity.noContent().build();
+    }
+
+    private boolean isAdmin(Authentication authentication) {
+        return authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
     }
 
     /**

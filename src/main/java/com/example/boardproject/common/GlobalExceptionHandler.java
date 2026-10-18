@@ -56,6 +56,13 @@ public class GlobalExceptionHandler {
                 .body(buildErrorBody(HttpStatus.UNAUTHORIZED, e.getMessage()));
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<Map<String, Object>> handleForbiddenException(ForbiddenException e) {
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(buildErrorBody(HttpStatus.FORBIDDEN, e.getMessage()));
+    }
+
     @ExceptionHandler(PropertyReferenceException.class)
     public ResponseEntity<Map<String, Object>> handleInvalidSort(PropertyReferenceException e) {
         return ResponseEntity

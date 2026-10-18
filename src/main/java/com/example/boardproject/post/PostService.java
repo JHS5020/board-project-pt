@@ -1,5 +1,6 @@
 package com.example.boardproject.post;
 
+import com.example.boardproject.common.ForbiddenException;
 import com.example.boardproject.common.NotFoundException;
 import com.example.boardproject.common.UnauthorizedException;
 import com.example.boardproject.member.Member;
@@ -7,6 +8,7 @@ import com.example.boardproject.member.MemberRepository;
 import com.example.boardproject.post.dto.PostCreateRequest;
 import com.example.boardproject.post.dto.PostListResponse;
 import com.example.boardproject.post.dto.PostResponse;
+import com.example.boardproject.post.dto.PostUpdateRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -25,7 +27,9 @@ public class PostService {
     private final PostRepository postRepository;
     private final MemberRepository memberRepository;
 
-    /** 게시글 작성. 작성자는 요청 바디가 아니라 로그인한 사용자(username)로 결정한다. */
+    /**
+     * 게시글 작성. 작성자는 요청 바디가 아니라 로그인한 사용자(username)로 결정한다.
+     */
     @Transactional
     public Long create(String username, PostCreateRequest request) {
         Member author = memberRepository.findByUsername(username)
@@ -41,7 +45,9 @@ public class PostService {
         return postRepository.save(post).getId();
     }
 
-    /** 게시글 단건 조회. 회원 전용 글은 로그인한 사용자만 볼 수 있다. */
+    /**
+     * 게시글 단건 조회. 회원 전용 글은 로그인한 사용자만 볼 수 있다.
+     */
     public PostResponse getPost(Long postId, boolean loggedIn) {
         Post post = postRepository.findById(postId)
                 .filter(p -> !p.isDeleted()) // 삭제된 글은 "없는 글"과 똑같이 취급 → 404
@@ -54,9 +60,42 @@ public class PostService {
         return PostResponse.from(post); // author는 LAZY → 반드시 이 트랜잭션 안에서 변환
     }
 
-    /** 게시글 목록 조회. 회원 전용 글도 제목은 보이고, 본문(content)은 목록 DTO에 아예 없다. */
+    /**
+     * 게시글 목록 조회. 회원 전용 글도 제목은 보이고, 본문(content)은 목록 DTO에 아예 없다.
+     */
     public Page<PostListResponse> getPosts(Pageable pageable) {
         return postRepository.findByDeletedAtIsNull(pageable)
                 .map(PostListResponse::from);
+    }
+
+    private Post findActivePost(Long postId) {
+        return postRepository.findById(postId)
+                .filter(p -> !p.isDeleted())
+                .orElseThrow(() -> new NotFoundException("게시글을 찾을 수 없습니다."));
+    }
+
+    /** 게시글 수정. 작성자 본인만 가능 (ADMIN도 남의 글은 수정 불가). */
+    @Transactional
+    public void update(Long postId, String username, PostUpdateRequest request) {
+        Post post = findActivePost(postId);
+
+        if (!post.isAuthor(username)) {
+            throw new ForbiddenException("본인이 작성한 게시글만 수정할 수 있습니다.");
+        }
+
+        // save() 호출 불필요: 영속 상태 엔티티라서 트랜잭션 종료 시 변경 감지(dirty checking)로 UPDATE 됨
+        post.update(request.getTitle(), request.getContent(), request.getVisibility());
+    }
+
+    /** 게시글 삭제(soft delete). 작성자 본인 또는 ADMIN만 가능. */
+    @Transactional
+    public void delete(Long postId, String username, boolean isAdmin) {
+        Post post = findActivePost(postId);
+
+        if (!isAdmin && !post.isAuthor(username)) {
+            throw new ForbiddenException("본인이 작성한 게시글만 삭제할 수 있습니다.");
+        }
+
+        post.softDelete();
     }
 }
