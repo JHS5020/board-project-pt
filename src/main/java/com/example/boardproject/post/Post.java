@@ -70,9 +70,10 @@ public class Post extends BaseEntity {
         this.visibility = (visibility == null) ? Visibility.PUBLIC : visibility; // 미지정 시 공개
     }
 
-    public void update(String title, String content) {
+    public void update(String title, String content, Visibility visibility) {
         this.title = title;
         this.content = content;
+        this.visibility = visibility;
     }
 
     public void softDelete() {
@@ -86,5 +87,10 @@ public class Post extends BaseEntity {
     /** 열람 규칙을 엔티티 한 곳에 모아둔다. 규칙이 바뀌면 여기만 고치면 된다. */
     public boolean canBeReadBy(boolean loggedIn) {
         return visibility == Visibility.PUBLIC || loggedIn;
+    }
+
+    /** 작성자 본인인지 확인. author는 LAZY라서 트랜잭션 안에서 호출해야 한다. */
+    public boolean isAuthor(String username) {
+        return this.author.getUsername().equals(username);
     }
 }
