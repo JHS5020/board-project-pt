@@ -1,59 +1,79 @@
 package com.example.boardproject.post;
 
+import com.example.boardproject.post.dto.PostSearchCondition;
+import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 
 import static com.example.boardproject.member.QMember.member;
 import static com.example.boardproject.post.QPost.post;
 
-/**
- * 이름 규칙 중요: 반드시 "PostRepositoryCustom을 구현하는 클래스 이름"이
- * "PostRepository" + "Impl" 이어야 Spring Data JPA가 자동으로 인식해서
- * PostRepository와 연결해줍니다. (Spring Data JPA의 관례 - 어노테이션 없이 이름만으로 동작)
- */
 @RequiredArgsConstructor
 public class PostRepositoryImpl implements PostRepositoryCustom {
 
-    // QuerydslConfig에서 등록해둔 빈을 생성자 주입으로 받습니다.
-    // (@RequiredArgsConstructor가 final 필드를 파라미터로 받는 생성자를 자동 생성해줌)
     private final JPAQueryFactory queryFactory;
 
     @Override
-    public List<Post> search(String title, String nickname) {
-        return queryFactory
-                .selectFrom(post)                        // SELECT * FROM post
-                .join(post.author, member)                // JOIN member (post.author와 연관관계로 조인)
+    public Page<Post> search(PostSearchCondition condition, Pageable pageable) {
+
+        // 1) 내용 조회: author를 fetch join → 목록 변환 시 N+1 없음 (기존 @EntityGraph와 같은 목적)
+        List<Post> content = queryFactory
+                .selectFrom(post)
+                .join(post.author, member).fetchJoin()
                 .where(
-                        titleContains(title),             // 조건들을 메서드로 분리 (아래 설명)
-                        nicknameEq(nickname),
-                        notDeleted()                       // 항상 붙는 고정 조건 - 삭제된 글 제외
+                        post.deletedAt.isNull(),
+                        keywordCondition(condition)   // null이면 where에서 알아서 무시됨
                 )
-                .fetch();                                  // 실제 쿼리 실행 후 리스트로 반환
+                .orderBy(orderSpecifiers(condition))
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetch();
+
+        // 2) 전체 개수 조회: 개수만 필요하니 join 없이
+        Long total = queryFactory
+                .select(post.count())
+                .from(post)
+                .where(
+                        post.deletedAt.isNull(),
+                        keywordCondition(condition)
+                )
+                .fetchOne();
+
+        return new PageImpl<>(content, pageable, total == null ? 0 : total);
     }
 
-    /**
-     * 아래처럼 조건을 별도 private 메서드로 쪼개는 게 QueryDSL의 핵심 패턴입니다.
-     *
-     * BooleanExpression을 리턴 타입으로 쓰는 이유:
-     *   .where() 안에 값을 콤마로 나열하면, QueryDSL이 자동으로 AND로 묶어줍니다.
-     *   그리고 null을 리턴하면 그 조건은 자동으로 무시됩니다 (SQL에 아예 안 들어감).
-     *
-     * 즉, "title이 없으면 조건 자체를 안 넣고, 있으면 LIKE 조건을 넣는다"를
-     * if문 없이 매우 깔끔하게 표현할 수 있습니다. 이게 메서드 이름 쿼리로는
-     * 사실상 불가능했던 부분이에요.
-     */
-    private BooleanExpression titleContains(String title) {
-        return (title == null || title.isBlank()) ? null : post.title.contains(title);
+    /** keyword가 없으면 null(=조건 없음). 있으면 type에 따라 조건 생성. */
+    private BooleanExpression keywordCondition(PostSearchCondition condition) {
+        if (!StringUtils.hasText(condition.getKeyword())) {
+            return null;
+        }
+        String keyword = condition.getKeyword().trim();
+
+        BooleanExpression titleMatch = post.title.containsIgnoreCase(keyword);
+
+        return switch (condition.getType()) {
+            case TITLE -> titleMatch;
+            case TITLE_CONTENT -> titleMatch.or(contentMatch(keyword, condition.isLoggedIn()));
+        };
     }
 
-    private BooleanExpression nicknameEq(String nickname) {
-        return (nickname == null || nickname.isBlank()) ? null : member.nickname.eq(nickname);
+    /** 비로그인이면 PUBLIC 글의 본문만 검색 대상 (회원 전용 본문 추측 방지). */
+    private BooleanExpression contentMatch(String keyword, boolean loggedIn) {
+        BooleanExpression match = post.content.containsIgnoreCase(keyword);
+        return loggedIn ? match : match.and(post.visibility.eq(Visibility.PUBLIC));
     }
 
-    private BooleanExpression notDeleted() {
-        return post.deletedAt.isNull();
+    /** 정렬 기준은 여기 한 곳에서만 관리. 인기순은 case 하나만 추가하면 된다. */
+    private OrderSpecifier<?>[] orderSpecifiers(PostSearchCondition condition) {
+        return switch (condition.getSortType()) {
+            case LATEST -> new OrderSpecifier<?>[]{ post.id.desc() };
+        };
     }
 }
