@@ -1,18 +1,19 @@
 package com.example.boardproject.post;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.EntityGraph;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
-/**
- * JpaRepository와 PostRepositoryCustom을 둘 다 상속받습니다.
- * 그래서 이 인터페이스 하나로 기본 CRUD(JpaRepository)와
- * 커스텀 동적 쿼리(PostRepositoryCustom)를 모두 쓸 수 있게 됩니다.
- */
 public interface PostRepository extends JpaRepository<Post, Long>, PostRepositoryCustom {
 
-    // 삭제되지 않은 글만, 페이징해서 조회. author를 함께 가져와서(N+1 방지) 목록 변환 시 추가 쿼리가 없다.
-    @EntityGraph(attributePaths = "author")
-    Page<Post> findByDeletedAtIsNull(Pageable pageable);
+    // DB에게 "현재 값에서 +1" 시키는 벌크 UPDATE → 동시에 눌러도 갱신 손실 없음
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Post p set p.likeCount = p.likeCount + 1 where p.id = :postId")
+    void increaseLikeCount(@Param("postId") Long postId);
+
+    // 0 아래로 내려가지 않도록 방어 조건 추가
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("update Post p set p.likeCount = p.likeCount - 1 where p.id = :postId and p.likeCount > 0")
+    void decreaseLikeCount(@Param("postId") Long postId);
 }

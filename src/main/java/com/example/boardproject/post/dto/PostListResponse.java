@@ -20,6 +20,7 @@ public class PostListResponse {
     private final String title;
     private final String authorNickname;
     private final Visibility visibility;
+    private final int likeCount;
     private final LocalDateTime createdAt;
 
     public static PostListResponse from(Post post) {
@@ -28,6 +29,7 @@ public class PostListResponse {
                 post.getTitle(),
                 post.getAuthor().getNickname(),
                 post.getVisibility(),
+                post.getLikeCount(),
                 post.getCreatedAt()
         );
     }

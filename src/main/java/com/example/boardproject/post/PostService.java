@@ -14,6 +14,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.example.boardproject.post.dto.PostSearchCondition;
 
 /**
  * 게시글 비즈니스 로직.
@@ -61,10 +62,10 @@ public class PostService {
     }
 
     /**
-     * 게시글 목록 조회. 회원 전용 글도 제목은 보이고, 본문(content)은 목록 DTO에 아예 없다.
+     * 게시글 목록 조회(+검색). 회원 전용 글도 제목은 보이고, 본문(content)은 목록 DTO에 아예 없다.
      */
-    public Page<PostListResponse> getPosts(Pageable pageable) {
-        return postRepository.findByDeletedAtIsNull(pageable)
+    public Page<PostListResponse> getPosts(PostSearchCondition condition, Pageable pageable) {
+        return postRepository.search(condition, pageable)
                 .map(PostListResponse::from);
     }
 

@@ -8,7 +8,7 @@ import com.example.boardproject.post.dto.PostUpdateRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import com.example.boardproject.post.dto.PostSearchCondition;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
@@ -47,11 +47,22 @@ public class PostController {
         return ResponseEntity.ok(postService.getPost(postId, isLoggedIn(authentication)));
     }
 
-    /** 게시글 목록 조회. 기본: 최신순(id 내림차순) 10개씩. 예) /api/posts?page=0&size=10 */
+    /**
+     * 게시글 목록 조회 + 검색. 예) /api/posts?type=TITLE_CONTENT&keyword=스프링&page=0&size=10
+     * keyword가 없으면 필터 없이 최신순. 정렬은 sortType으로 결정(기본 LATEST).
+     */
     @GetMapping
     public ResponseEntity<PageResponse<PostListResponse>> getPosts(
-            @PageableDefault(size = 10, sort = "id", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(postService.getPosts(pageable)));
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "TITLE") PostSearchType type,
+            @RequestParam(defaultValue = "LATEST") PostSortType sortType,
+            @PageableDefault(size = 10) Pageable pageable,
+            Authentication authentication) {
+
+        PostSearchCondition condition =
+                new PostSearchCondition(type, keyword, sortType, isLoggedIn(authentication));
+
+        return ResponseEntity.ok(PageResponse.from(postService.getPosts(condition, pageable)));
     }
 
     /** 게시글 수정. 로그인 필수. 성공 시 204 No Content. */

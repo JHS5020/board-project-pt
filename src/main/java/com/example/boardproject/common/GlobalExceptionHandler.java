@@ -63,6 +63,13 @@ public class GlobalExceptionHandler {
                 .body(buildErrorBody(HttpStatus.FORBIDDEN, e.getMessage()));
     }
 
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<Map<String, Object>> handleConflictException(ConflictException e) {
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(buildErrorBody(HttpStatus.CONFLICT, e.getMessage()));
+    }
+
     @ExceptionHandler(PropertyReferenceException.class)
     public ResponseEntity<Map<String, Object>> handleInvalidSort(PropertyReferenceException e) {
         return ResponseEntity
