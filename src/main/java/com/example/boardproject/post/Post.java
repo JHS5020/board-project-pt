@@ -49,6 +49,12 @@ public class Post extends BaseEntity {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    // ---- 추천수 ----
+    // 추천/취소할 때 PostRepository의 벌크 UPDATE 쿼리로만 증감시킨다. (엔티티에 setter/증가 메서드를 일부러 안 둠)
+    // int(primitive)라서 새 글은 자동으로 0
+    @Column(nullable = false)
+    private int likeCount;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "member_id", nullable = false) // 실제 FK 컬럼명 지정
     private Member author;
